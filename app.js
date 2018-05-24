@@ -18,9 +18,50 @@ app.get("/", function(req,res){
 });
 
 app.post('/upload', upload.single('file'), function (req, res) {
-    var tempPath = req.file.path,
-    targetPath = path.resolve('./upload/image.jpg');
-    if (path.extname(req.file.originalname).toLowerCase() === '.jpg') {
+    
+    // var file = req.files.file;
+
+    // console.log(file);
+
+(async () => {
+
+    uploadAction(req,"mozjpeg");
+
+    await imagemin(['upload/mozjpeg/*.jpg'], 'build/images', {
+        use: [
+            imageminMozjpeg()
+        ]
+    });
+
+        console.log('Images optimized');
+    })();
+});
+
+
+app.get("/uploadG", upload.single('file'), function(req,res){
+    (async () => {
+
+    uploadAction(req,"guetzli");
+
+   imagemin(['upload/guetzli/*.{png,jpg}'], 'build/images', {
+    use: [
+        imageminGuetzli({quality: 95})
+    ]
+    });
+
+        console.log('Images optimized');
+    })();
+});
+
+
+
+
+function uploadAction(req,path){
+    var tempPath = req.file.path;
+    console.log(req.file);
+    targetPath = path.resolve("./upload/"+path+"/image"+req.file.filename+".jpg");
+    if (path.extname(req.file.originalname).toLowerCase() === '.jpg' || 
+        path.extname(req.file.originalname).toLowerCase() === '.png') {
         fs.rename(tempPath, targetPath, function(err) {
             if (err) throw err;
             console.log("Upload completed!");
@@ -28,24 +69,10 @@ app.post('/upload', upload.single('file'), function (req, res) {
     } else {
         fs.unlink(tempPath, function () {
             if (err) throw err;
-            console.error("Only .jpg files are allowed!");
+            console.error("Only .jpg  and .png files are allowed!");
         });
     }
-    // var file = req.files.file;
-
-    // console.log(file);
-
-(async () => {
-    await imagemin(['upload/*.jpg'], 'build/images', {
-        use: [
-            imageminMozjpeg()
-        ]
-    });
-
-    console.log('Images optimized');
-})();
-console.log('Hello!');
-});
+}
 
 app.listen(3030, function() {
     console.log("Server Started");
