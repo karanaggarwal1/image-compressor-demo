@@ -8,6 +8,7 @@ const imagemin = require('imagemin');
 const imageminMozjpeg = require('imagemin-mozjpeg');
 const imageminGuetzli = require('imagemin-guetzli');
 
+var fileUploadName = "";
 
 app.use(bodyParser.urlencoded({'extended':'true'}));
 
@@ -18,48 +19,37 @@ app.get("/", function(req,res){
     res.render("landing");
 });
 
+
+function removeMetadata(fileName){
+    //TODO: implement native metadata removal using C++
+}
+
 app.post('/upload', upload.single('file'), function (req, res) {
-    
-    // var file = req.files.file;
-
-    // console.log(file);
-
-(async () => {
-
-    uploadAction(req,"mozjpeg");
-
-    await imagemin(['upload/mozjpeg/*.jpg'], 'build/images/mozjpeg', {
-        use: [
-            imageminMozjpeg()
-        ]
-    });
-
+    (async () => {
+        uploadAction(req,"mozjpeg");
+        await imagemin(['upload/mozjpeg/*.jpg'], 'build/images/mozjpeg', {
+            use: [
+                imageminMozjpeg()
+            ]
+        });
         console.log('Images optimized');
     })();
 });
-
 
 app.post("/uploadG", upload.single('file'), function(req,res){
     (async () => {
-
-    uploadAction(req,"guetzli");
-
-   imagemin(['upload/guetzli/*.{png,jpg}'], 'build/images/guetzli', {
-    use: [
-        imageminGuetzli({quality: 84})
-    ]
-    });
-
+        uploadAction(req,"guetzli");
+        imagemin(['upload/guetzli/*.{png,jpg}'], 'build/images/guetzli', {
+            use: [
+                imageminGuetzli({quality: 84})
+            ]
+        });
         console.log('Images optimized');
-    })();
+        })();
 });
-
-
-
 
 function uploadAction(req,pathname){
     var tempPath = req.file.path;
-    console.log(req.file);
     targetPath = path.resolve("./upload/"+pathname+"/image"+req.file.filename+".jpg");
     if (path.extname(req.file.originalname).toLowerCase() === '.jpg' || 
         path.extname(req.file.originalname).toLowerCase() === '.png') {
@@ -67,6 +57,9 @@ function uploadAction(req,pathname){
             if (err) throw err;
             console.log("Upload completed!");
         });
+        //currently the code will handle only jpg files, needs to be modified for
+        //other file formats
+        fileUploadName="image"+req.file.filename+".jpg";
     } else {
         fs.unlink(tempPath, function () {
             if (err) throw err;
