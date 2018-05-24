@@ -6,6 +6,7 @@ const path = require("path");
 const upload = multer({ dest: 'upload/'});
 const imagemin = require('imagemin');
 const imageminMozjpeg = require('imagemin-mozjpeg');
+const imageminGuetzli = require('imagemin-guetzli');
 
 
 app.use(bodyParser.urlencoded({'extended':'true'}));
@@ -27,7 +28,7 @@ app.post('/upload', upload.single('file'), function (req, res) {
 
     uploadAction(req,"mozjpeg");
 
-    await imagemin(['upload/mozjpeg/*.jpg'], 'build/images', {
+    await imagemin(['upload/mozjpeg/*.jpg'], 'build/images/mozjpeg', {
         use: [
             imageminMozjpeg()
         ]
@@ -38,14 +39,14 @@ app.post('/upload', upload.single('file'), function (req, res) {
 });
 
 
-app.get("/uploadG", upload.single('file'), function(req,res){
+app.post("/uploadG", upload.single('file'), function(req,res){
     (async () => {
 
     uploadAction(req,"guetzli");
 
-   imagemin(['upload/guetzli/*.{png,jpg}'], 'build/images', {
+   imagemin(['upload/guetzli/*.{png,jpg}'], 'build/images/guetzli', {
     use: [
-        imageminGuetzli({quality: 95})
+        imageminGuetzli({quality: 84})
     ]
     });
 
@@ -56,10 +57,10 @@ app.get("/uploadG", upload.single('file'), function(req,res){
 
 
 
-function uploadAction(req,path){
+function uploadAction(req,pathname){
     var tempPath = req.file.path;
     console.log(req.file);
-    targetPath = path.resolve("./upload/"+path+"/image"+req.file.filename+".jpg");
+    targetPath = path.resolve("./upload/"+pathname+"/image"+req.file.filename+".jpg");
     if (path.extname(req.file.originalname).toLowerCase() === '.jpg' || 
         path.extname(req.file.originalname).toLowerCase() === '.png') {
         fs.rename(tempPath, targetPath, function(err) {
