@@ -25,7 +25,7 @@ coverage
 
 #intermediate output
 build/
-upload/
+
 
 # Grunt intermediate storage (http://gruntjs.com/creating-plugins#storing-task-files)
 .grunt
