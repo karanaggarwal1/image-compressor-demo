@@ -13,6 +13,7 @@ const imageminWebP = require('imagemin-webp');
 const ex = require("exiv2");
 const CWebp = require('cwebp').CWebp;
 const easyimg = require("easyimage");
+const imageminGif2webp = require('imagemin-gif2webp');
 
 var fileName = "";
 
@@ -37,7 +38,9 @@ function removeMetadata() {
     return new Promise((resolve, reject) => {
         ex.getImageTags(fileName, function(err, data) {
             if (err) {
-                console.error(err, err.stack);
+                console.log("Error Occured here!");
+                console.log(fileName);
+                console.error(err);
                 reject(err);
             } else {
                 if (data != null) {
@@ -94,65 +97,74 @@ function removeMetadata() {
 //     })();
 // });
 
-app.post("/upload", upload.single('file'), function(req, res) {
-    (async () => {
-        var extension = req.file.originalname.split('.');
-        extension = extension[extension.length - 1];
-        if (extension != "jpg") {
-            if (validExtensions.includes(extension)) {
-                uploadAction(req, "webp").then(function() {
-                    console.log("Compression log!");
-                    console.log(fileName);
-                    imagemin(['upload/webp/*.webp'], 'build/images/webp', {
+function compressImage(file){
+    return new Promise((resolve, reject) => {
+        (async () => {
+            var extension = file.originalname.split('.');
+            extension = extension[extension.length - 1];
+            if (extension != "jpg") {
+                if (validExtensions.includes(extension)) {
+                    uploadAction(file, "webp").then(function() {
+                        console.log("Compression log!");
+                        console.log(fileName);
+                        imagemin(['upload/webp/*.webp'], 'build/images/webp', {
+                            use: [
+                                imageminWebP({
+                                    quality: 80
+                                })
+                            ]
+                        })
+                        resolve();
+                    }, function(err) {
+                        console.error(err);
+                        reject(err);
+                    });
+                } else if (rawFormats.includes(extension)) {
+                    uploadAction(file, "webp").then(function(deletePath, newPath) {
+                        fs.unlink(deletePath, function(err) {
+                            if (err) {
+                                console.error(err);
+                                reject(err);
+                            } else {
+                                //file is placed in new path
+                                //in webp format
+                                console.log("Compression log!");
+                                console.log(fileName);
+                                imagemin(['upload/webp/*.webp'], 'build/images/webp', {
+                                    use: [
+                                        imageminWebP({
+                                            quality: 80
+                                        })
+                                    ]
+                                });
+                                console.log('Images optimized');
+                                resolve();
+                            }
+                        });
+                    }, function(err) {
+                        console.error(err);
+                        reject(err);
+                    });
+                }
+
+            } else if (extension == "jpg") {
+                uploadAction(file, "mozjpeg").then(function() {
+                    imagemin(['upload/mozjpeg/*.jpg'], 'build/images/mozjpeg', {
                         use: [
-                            imageminWebP({
-                                quality: 80
-                            })
+                            imageminMozjpeg()
                         ]
                     })
                     console.log('Images optimized');
-                }, function(err) {
-                    console.error(err, err.stack);
-                });
-            } else if (rawFormats.includes(extension)) {
-                uploadAction(req, "webp").then(function(deletePath, newPath) {
-                    fs.unlink(deletePath, function(err) {
-                        if (err) {
-                            console.error(err);
-                        } else {
-                            //file is placed in new path
-                            //in webp format
-                            console.log("Compression log!");
-                            console.log(fileName);
-                            imagemin(['upload/webp/*.webp'], 'build/images/webp', {
-                                use: [
-                                    imageminWebP({
-                                        quality: 80
-                                    })
-                                ]
-                            });
-                            console.log('Images optimized');
-                        }
-                    });
+                    resolve();
                 }, function(err) {
                     console.error(err);
-                })
+                    reject(err);
+                });
             }
+        })();
+    });
+}
 
-        } else if (extension == "jpg") {
-            uploadAction(req, "mozjpeg").then(function() {
-                imagemin(['upload/mozjpeg/*.jpg'], 'build/images/mozjpeg', {
-                    use: [
-                        imageminMozjpeg()
-                    ]
-                })
-                console.log('Images optimized');
-            }, function(err) {
-                console.error(err, err.stack);
-            });
-        }
-    })();
-});
 
 const validExtensions = ["jpg", "exif", "tiff", "gif", "bmp", "png", "webp"];
 
@@ -162,15 +174,21 @@ const rawFormats = [".3fr", ".ari", ".arw", ".bay", ".crw", ".cr2", ".cr3", ".ca
     ".tif", ".x3f"
 ];
 
-function simpleUpload(req, tempPath, pathname, extension) {
+app.post("/upload", upload.array('uploadedImages', 10), function(req, res){
+    console.log(req.files);
+    req.files.forEach(executeProcess);
+});
+
+
+function simpleUpload(file, tempPath, pathname, extension){
     return new Promise((resolve, reject) => {
-        var path_val = "./upload/" + pathname + "/" + req.file.filename + "." + extension;
+        var path_val = "./upload/" + pathname + "/" + file.filename + "." + extension;
         fileName = path_val;
         var targetPath = path.resolve(path_val);
 
         fs.rename(tempPath, targetPath, function(err) {
             if (err) {
-                console.log(err, err.stack);
+                console.log(err, err);
                 reject(err);
             } else {
                 displaySize(targetPath);
@@ -185,36 +203,92 @@ function simpleUpload(req, tempPath, pathname, extension) {
     });
 }
 
+
+// function batchProcessing(numTimes, req){
+//     const func_array = [];
+//     for(var i = 0 ; i < numTimes ; i++){
+//         func_array.push(async.apply(executeProcess, req));
+//     }
+//     async.parallel(func_array, function(err, results) {
+//         console.log("CONCURRENT Execution");
+//         console.log(results);
+//     });
+// }
+
+function executeProcess(file){
+    compressImage(file).then(function(){
+        console.log("Image Optimized");
+        // res.send("Images Optimized");
+    }, function(err){
+        console.log(err);
+        res.send(err.stack);
+    });
+}
+
 const preferredExtensions = ["webp", "jpg"];
+
+var supported_alternate_formats = ["png", "tiff"];
 
 function changeFormat(filePath) {
     return new Promise((resolve, reject) => {
         var encoder = new CWebp(filePath);
         console.log(filePath);
-        fileName = filePath.split(".")
-        fileName.pop();
-        fileName = fileName.join(".");
-        fileName = fileName.split("/");
-        fileName = fileName[0] + "/webp/" + fileName[1];
-        fileName = "./" + fileName + ".webp";
-        console.log(fileName);
-        encoder.quality(100);
-        encoder.write(fileName, function(err) {
-            if (err) {
-                console.err(err, err.stack);
-                reject();
-            } else {
-                console.log("File uploaded successfully!");
-                fs.unlink(filePath, function(err) {
-                    if (err) {
+        var old_extension = filePath.split(".");
+        old_extension = old_extension[old_extension.length-1];
+        if(old_extension == "gif"){
+            console.log("Here!");
+            //here include support for gif files
+            imagemin(["./"+filePath], 'upload/webp', {
+                use: [
+                    imageminGif2webp({quality: 100})
+                ]
+            }).then(() => {
+                console.log("Reached here!");
+                fileName = "./upload/webp/"+(filePath.split("/")[1]).split(".")[0]+".webp";
+                console.log(fileName);
+                fs.unlink("./"+filePath, function(err){
+                    if(err){
                         console.error(err);
                     } else {
                         resolve();
                     }
-                })
-            }
-        });
-    })
+                }) 
+                // resolve();
+            }, function(err){
+                console.log("Error occured here!");
+                console.log(err);
+                reject(err);
+            });
+        } else if(!supported_alternate_formats.includes(old_extension)){
+            console.log("Image format not supported!");
+            reject("Err:UnsupportedImageFormat");
+        } else {
+            fileName = filePath.split(".")
+            fileName.pop();
+            fileName = fileName.join(".");
+            fileName = fileName.split("/");
+            fileName = fileName[0] + "/webp/" + fileName[1];
+            fileName = "./" + fileName + ".webp";
+            console.log(fileName);
+            encoder.quality(100);
+            encoder.write(fileName, function(err) {
+                if (err) {
+                    console.error(err, err);
+                    reject();
+                } else {
+                    console.log("File uploaded successfully!");
+                    fs.unlink(filePath, function(err) {
+                        if (err) {
+                            console.error(err);
+                            reject(err);
+                        } else {
+                            resolve();
+                        }
+                    });
+                }
+            });
+        } 
+    });
 
 }
 
@@ -223,7 +297,7 @@ function changeName(path, extension) {
         var new_name = path + "." + extension;
         fs.rename(path, new_name, function(err) {
             if (err) {
-                console.error(err, err.stack);
+                console.error(err);
                 reject(err);
             } else {
                 //file has been renamed, that is, made suitable for conversion
@@ -237,17 +311,16 @@ function changeName(path, extension) {
     });
 }
 
-
-function uploadAction(req, pathname) {
-    return new Promise((resolve, reject) => {
-        var tempPath = req.file.path;
-        var extension = req.file.originalname.split(".");
+function uploadAction(file, pathname){
+        return new Promise((resolve, reject) => {
+        var tempPath = file.path;
+        var extension = file.originalname.split(".");
         extension = extension[extension.length - 1];
         extension = extension.toLowerCase();
         if (validExtensions.includes(extension)) {
             if (preferredExtensions.includes(extension)) {
-                console.log(req.file);
-                simpleUpload(req, tempPath, pathname, extension).then(function() {
+                console.log(file);
+                simpleUpload(file, tempPath, pathname, extension).then(function() {
                     resolve();
                 }, function(err) {
                     reject(err);
@@ -267,10 +340,10 @@ function uploadAction(req, pathname) {
         } else {
             if (rawFormats.includes(extension)) {
                 //raw image
-                var rawName = "./" + req.file.path + "." + extension;
-                var webpName = "./upload/webp/" + req.file.path.split("/")[1] + ".webp";
+                var rawName = "./" + file.path + "." + extension;
+                var webpName = "./upload/webp/" + file.path.split("/")[1] + ".webp";
                 easyimg.convert({
-                        src: "./" + req.file.path,
+                        src: "./" + file.path,
                         dst: webpName,
                         quality: 100
                     },
@@ -283,7 +356,7 @@ function uploadAction(req, pathname) {
                             console.log(stdout);
                             flag = true;
                             console.log("Image Converted!");
-                            resolve("./" + req.file.path, webpName);
+                            resolve("./" + file.path, webpName);
                         }
                     }
                 );
@@ -292,13 +365,10 @@ function uploadAction(req, pathname) {
                 console.error("File format not supported!");
                 reject("UnsupportedFormat");
             }
-
-
         }
-
     });
-
 }
+
 
 app.listen(3030, function() {
     console.log("Server Started");

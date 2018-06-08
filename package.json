@@ -4,7 +4,8 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "setMac": "brew install pkg-config exiv2"
   },
   "keywords": [
     "Test",
@@ -13,6 +14,7 @@
   "author": "Karan Aggarwal",
   "license": "ISC",
   "dependencies": {
+    "async": "^2.6.1",
     "body-parser": "^1.18.3",
     "cwebp": "^2.0.2",
     "easyimage": "^3.1.0",
@@ -22,6 +24,7 @@
     "fs": "0.0.1-security",
     "imagemagick": "^0.1.3",
     "imagemin": "^5.3.1",
+    "imagemin-gif2webp": "^1.0.0",
     "imagemin-guetzli": "^1.0.0",
     "imagemin-mozjpeg": "^7.0.0",
     "imagemin-webp": "^4.1.0",
