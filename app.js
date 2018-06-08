@@ -94,64 +94,83 @@ function removeMetadata() {
 //     })();
 // });
 
-app.post("/upload", upload.single('file'), function(req, res) {
-    (async () => {
-        var extension = req.file.originalname.split('.');
-        extension = extension[extension.length - 1];
-        if (extension != "jpg") {
-            if (validExtensions.includes(extension)) {
-                uploadAction(req, "webp").then(function() {
-                    console.log("Compression log!");
-                    console.log(fileName);
-                    imagemin(['upload/webp/*.webp'], 'build/images/webp', {
+function compressImage(req){
+    return new Promise((resolve, reject) => {
+        (async () => {
+            var extension = req.file.originalname.split('.');
+            extension = extension[extension.length - 1];
+            if (extension != "jpg") {
+                if (validExtensions.includes(extension)) {
+                    uploadAction(req, "webp").then(function() {
+                        console.log("Compression log!");
+                        console.log(fileName);
+                        imagemin(['upload/webp/*.webp'], 'build/images/webp', {
+                            use: [
+                                imageminWebP({
+                                    quality: 80
+                                })
+                            ]
+                        })
+                        // console.log('Images optimized');
+                        resolve();
+                    }, function(err) {
+                        console.error(err, err.stack);
+                        reject(err);
+                    });
+                } else if (rawFormats.includes(extension)) {
+                    uploadAction(req, "webp").then(function(deletePath, newPath) {
+                        fs.unlink(deletePath, function(err) {
+                            if (err) {
+                                console.error(err);
+                                reject(err);
+                            } else {
+                                //file is placed in new path
+                                //in webp format
+                                console.log("Compression log!");
+                                console.log(fileName);
+                                imagemin(['upload/webp/*.webp'], 'build/images/webp', {
+                                    use: [
+                                        imageminWebP({
+                                            quality: 80
+                                        })
+                                    ]
+                                });
+                                // console.log('Images optimized');
+                                resolve();
+                            }
+                        });
+                    }, function(err) {
+                        console.error(err);
+                        reject(err);
+                    })
+                }
+
+            } else if (extension == "jpg") {
+                uploadAction(req, "mozjpeg").then(function() {
+                    imagemin(['upload/mozjpeg/*.jpg'], 'build/images/mozjpeg', {
                         use: [
-                            imageminWebP({
-                                quality: 80
-                            })
+                            imageminMozjpeg()
                         ]
                     })
-                    console.log('Images optimized');
+                    // console.log('Images optimized');
+                    resolve();
                 }, function(err) {
                     console.error(err, err.stack);
+                    reject(err);
                 });
-            } else if (rawFormats.includes(extension)) {
-                uploadAction(req, "webp").then(function(deletePath, newPath) {
-                    fs.unlink(deletePath, function(err) {
-                        if (err) {
-                            console.error(err);
-                        } else {
-                            //file is placed in new path
-                            //in webp format
-                            console.log("Compression log!");
-                            console.log(fileName);
-                            imagemin(['upload/webp/*.webp'], 'build/images/webp', {
-                                use: [
-                                    imageminWebP({
-                                        quality: 80
-                                    })
-                                ]
-                            });
-                            console.log('Images optimized');
-                        }
-                    });
-                }, function(err) {
-                    console.error(err);
-                })
             }
+        })();
+    });
+}
 
-        } else if (extension == "jpg") {
-            uploadAction(req, "mozjpeg").then(function() {
-                imagemin(['upload/mozjpeg/*.jpg'], 'build/images/mozjpeg', {
-                    use: [
-                        imageminMozjpeg()
-                    ]
-                })
-                console.log('Images optimized');
-            }, function(err) {
-                console.error(err, err.stack);
-            });
-        }
-    })();
+app.post("/upload", upload.single('file'), function(req, res) {
+    compressImage(req).then(function(){
+        console.log("Images Optimized");
+        res.send("Images Optimized");
+    }, function(err){
+        console.log(err);
+        res.send(err.stack);
+    });
 });
 
 const validExtensions = ["jpg", "exif", "tiff", "gif", "bmp", "png", "webp"];
